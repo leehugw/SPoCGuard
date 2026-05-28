@@ -84,12 +84,10 @@ contract VulnerableStakingVault {
         stakingToken.transfer(msg.sender, amount);
     }
 
-    // VULNERABILITY 1: Missing Access Control
     function setRewardRate(uint256 _newRate) external {
         rewardRate = _newRate;
     }
 
-    // VULNERABILITY 2: Arbitrary Transfer From
     function migrateFunds(address from, address to, uint256 amount) external {
         stakingToken.transferFrom(from, to, amount);
     }

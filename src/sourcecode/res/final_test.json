@@ -1,0 +1,45 @@
+{
+    "target_file": "test.sol",
+    "slither_raw_findings": [
+        {
+            "vulnerability": "arbitrary-send-erc20",
+            "severity": "High",
+            "confidence": "High",
+            "description": "VulnerableStakingVault.migrateFunds(address,address,uint256) (src/sourcecode/obj/test.sol#91-93) uses arbitrary from in transferFrom: stakingToken.transferFrom(from,to,amount) (src/sourcecode/obj/test.sol#92)",
+            "locations": [
+                "function 'migrateFunds' (lines: 91-93)",
+                "node 'stakingToken.transferFrom(from,to,amount)' (lines: 92-92)"
+            ]
+        },
+        {
+            "vulnerability": "unchecked-transfer",
+            "severity": "High",
+            "confidence": "Medium",
+            "description": "VulnerableStakingVault.withdraw(uint256) (src/sourcecode/obj/test.sol#80-85) ignores return value by stakingToken.transfer(msg.sender,amount) (src/sourcecode/obj/test.sol#84)",
+            "locations": [
+                "function 'withdraw' (lines: 80-85)",
+                "node 'stakingToken.transfer(msg.sender,amount)' (lines: 84-84)"
+            ]
+        },
+        {
+            "vulnerability": "unchecked-transfer",
+            "severity": "High",
+            "confidence": "Medium",
+            "description": "VulnerableStakingVault.deposit(uint256) (src/sourcecode/obj/test.sol#73-78) ignores return value by stakingToken.transferFrom(msg.sender,address(this),amount) (src/sourcecode/obj/test.sol#77)",
+            "locations": [
+                "function 'deposit' (lines: 73-78)",
+                "node 'stakingToken.transferFrom(msg.sender,address(this),amount)' (lines: 77-77)"
+            ]
+        },
+        {
+            "vulnerability": "unchecked-transfer",
+            "severity": "High",
+            "confidence": "Medium",
+            "description": "VulnerableStakingVault.migrateFunds(address,address,uint256) (src/sourcecode/obj/test.sol#91-93) ignores return value by stakingToken.transferFrom(from,to,amount) (src/sourcecode/obj/test.sol#92)",
+            "locations": [
+                "function 'migrateFunds' (lines: 91-93)",
+                "node 'stakingToken.transferFrom(from,to,amount)' (lines: 92-92)"
+            ]
+        }
+    ]
+}
