@@ -13,7 +13,13 @@ logger = logging.getLogger(__name__)
 
 console = rich.get_console()
 
-SYSTEM_MESSAGE = "You are a smart contract auditor. You will be asked questions related to code properties. You can mimic answering them in the background five times and provide me with the most frequently appearing answer. Furthermore, please strictly adhere to the output format specified in the question; there is no need to explain your answer."
+#  SYSTEM_MESSAGE = "You are a smart contract auditor. You will be asked questions related to code properties. You can mimic answering them in the background five times and provide me with the most frequently appearing answer. Furthermore, please strictly adhere to the output format specified in the question; there is no need to explain your answer."
+SYSTEM_MESSAGE = """You are an elite smart contract security auditor and exploit developer. 
+Your primary task is to detect critical logical vulnerabilities (like Reentrancy, Access Control, Price Manipulation, Arbitrary Transfer) in the provided Solidity code.
+- If you find a vulnerability, YOU MUST explicitly point it out.
+- Do NOT just answer Yes/No. Always provide a brief explanation of HOW the attack can be executed.
+- If requested, generate a short Foundry/Hardhat PoC (Proof of Concept) script to demonstrate the exploit.
+Always ensure your output strictly follows the JSON format requested by the user, but inject your detailed exploit analysis into the explanation fields."""
 
 encoder = tiktoken.get_encoding("cl100k_base")
 encoder = tiktoken.encoding_for_model("gpt-3.5-turbo")
@@ -39,25 +45,23 @@ class Chat:
         
         self.currentSession.append({"role": "system", "content": SYSTEM_MESSAGE})
         self.currentSession.append({"role": "user", "content": message})
+
+        openai.api_base = "http://localhost:11434/v1"
+        openai.api_key = "KANE"
+
         while True:
             try:
                 if GPT4:
                     openai.api_key = GPT4_API
                     response = openai.ChatCompletion.create(
-                        # model="gpt-3.5-turbo-0301",
-                        # model="gpt-3.5-turbo-0613",
-                        # model="gpt-3.5-turbo",
-                        model="gpt-4",
+                        model="qwen3-coder:30b",
                         messages = self.currentSession,
                         temperature = 0,
                         top_p = 1.0
                     )
                 else:
                     response = openai.ChatCompletion.create(
-                        model="gpt-3.5-turbo",
-                        # model="gpt-3.5-turbo-0613",
-                        # model="gpt-3.5-turbo",
-                        # model="gpt-4",
+                        model="qwen3-coder:30b",
                         messages = self.currentSession,
                         temperature = 0,
                         top_p = 1.0
@@ -66,20 +70,23 @@ class Chat:
             except openai.error.RateLimitError as e1:
                 logger.warning("Trigger rate limit error, sleep 30 sec")
                 time.sleep(30)
-            except openai.InvalidRequestError as e2:
+            except openai.error.InvalidRequestError as e2: 
                 if e2.code == 'context_length_exceeded':
                     logger.error("Too long context, skip")
                     return "KeySentence: "
                 else:
-                    logger.warning("Retry")
+                    logger.warning(f"Invalid Request, Retry: {e2}")
             except openai.error.APIConnectionError as e3:
-                logger.warning("API Connection Error, Retry")
+                logger.warning(f"API Connection Error, Retry: {e3}")
+                time.sleep(5) 
             except openai.error.Timeout as e4:
                 logger.warning("Timeout, Retry")
             except openai.error.APIError as e5:
                 if "502" in e5._message:
                     logger.warning("502 Bad Gateway, Retry")
                     logger.warning(traceback.format_exc())
+                else:
+                    logger.warning(f"API Error: {e5}")
         # response = openai.Completion.create(
         #     # model="gpt-3.5-turbo",
         #     model="text-davinci-003",

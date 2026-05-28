@@ -356,9 +356,25 @@ When you do such semantic mapping, please strictly follow these three rules:
     return question_template
 
 
-def prompt_single_yes_no_question(question:str, code:str) -> str:
-    question_template = f"""Does the following smart contract code "{question}"? Answer only "Yes" or "No".
+# def prompt_single_yes_no_question(question:str, code:str) -> str:
+#     question_template = f"""Does the following smart contract code "{question}"? Answer only "Yes" or "No".
 
+# {code}
+#     """
+#     return question_template
+
+def prompt_single_yes_no_question(question:str, code:str) -> str:
+    # sửa prompt , bắt nó sinh POC
+    question_template = f"""Does the following smart contract code "{question}"?
+First, evaluate if the vulnerability exists.
+Then, output your response STRICTLY as a JSON object with the exact following format:
+{{
+    "answer": "Yes", 
+    "explanation": "Your detailed explanation here...",
+    "poc_script": "If Answer is Yes, write a short Foundry/Hardhat Proof-of-Concept exploit script here. If No, output an empty string."
+}}
+
+Code:
 {code}
     """
     return question_template

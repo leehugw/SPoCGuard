@@ -98,6 +98,7 @@ def convert_output(origin_output:Dict, scan_rules:List[Dict], cg:CallGraph, base
                 for functionB_sig in origin_output[filename][contract][functionA]:
                     for vul_type in origin_output[filename][contract][functionA][functionB_sig]:
                         if "StaticAnalysis" in origin_output[filename][contract][functionA][functionB_sig][vul_type] and origin_output[filename][contract][functionA][functionB_sig][vul_type]["StaticAnalysis"] != False:
+                            vul_data = origin_output[filename][contract][functionA][functionB_sig][vul_type]
                             detail = cg.get_function_detail(filename, contract, functionA)
                             start_line = int(detail['loc']['start'].split(":")[0])
                             end_line = int(detail['loc']['end'].split(":")[0])
@@ -116,6 +117,10 @@ def convert_output(origin_output:Dict, scan_rules:List[Dict], cg:CallGraph, base
                                     "title": title,
                                     "description": description,
                                     "recommendation": recommendation,
+                                    # a bit update
+                                    "ai_explanation": vul_data.get("ai_explanation", "No explanation available."),
+                                    "poc_script": vul_data.get("poc_script", "No PoC available."),
+                                    # --------
                                     "affectedFiles": [
                                         {
                                         "filePath": rel_path,
@@ -146,6 +151,8 @@ def convert_output(origin_output:Dict, scan_rules:List[Dict], cg:CallGraph, base
                                         "title": title,
                                         "description": description,
                                         "recommendation": recommendation,
+                                        "ai_explanation": vul_data.get("ai_explanation", "No explanation available."),
+                                        "poc_script": vul_data.get("poc_script", "No PoC available."),
                                         "affectedFiles": [
                                             {
                                                 "filePath": rel_path,
@@ -212,12 +219,14 @@ def convert_output(origin_output:Dict, scan_rules:List[Dict], cg:CallGraph, base
         if not dup_flag:
             res["results"].append(result)
     
-    # printing output:
-    table = Table("Type", "Description", "Affected Files",title="Scan Results", show_lines=True)
+    # - add expaination and PoC collumn to the output
+    table = Table("Type", "Description", "AI Explanation", "PoC Script", "Affected Files", title="Scan Results", show_lines=True)
     for result in res["results"]:
         afftected_table = Table("File Path", "Line Range", "Code")
         for affectedFile in result["affectedFiles"]:
             afftected_table.add_row(affectedFile["filePath"], f"{affectedFile['range']['start']['line']} - {affectedFile['range']['end']['line']}", "\n".join(open(affectedFile["filePath"]).readlines()[affectedFile['range']['start']['line']-1:affectedFile['range']['end']['line']]))
-        table.add_row(result["title"].split(":")[1].strip(), result["description"], afftected_table)
+        
+        # more data to main table
+        table.add_row(result["title"].split(":")[1].strip(), result["description"], result.get("ai_explanation", ""), result.get("poc_script", ""), afftected_table)
     console.print(table)
     return res
