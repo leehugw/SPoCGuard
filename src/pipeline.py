@@ -238,30 +238,90 @@ class AuditPipeline:
             logger.info("[+] Contract is secure. No PoC needed.")
             return
 
-        logger.info(f"[*] Sending verified context to AI for PoC Generation...")
-        
-        poc_prompt = f'''
-        Task: Generate a single Foundry Proof of Concept (PoC) script exploiting the vulnerabilities found in {filename}.
-        
-        TIER 1 (Math Verified - MUST USE THESE PARAMS):
-        {halmos_context if halmos_context else "None"}
-        
-        TIER 2 (AI Verified):
-        {json.dumps(ai_filtered_vulnerabilities, indent=2)}
-        
-        CRITICAL: Output ONLY the raw Solidity PoC code. Start directly with "pragma solidity". No explanations.
-        '''
-        
-        raw_poc_code = self.chat.sendMessages(poc_prompt)
-        poc_code = raw_poc_code.replace("```solidity\n", "").replace("```", "").strip()
+        logger.info(f"[*] Starting AI PoC Generation with Auto-Correction (Max Retries: 3)...")
         
         poc_file_path = os.path.join(self.foundry_test, f"poc_{base_name}.t.sol")
-        with open(poc_file_path, 'w', encoding='utf-8') as f:
-            f.write(poc_code)
-            
-        logger.info(f"[+] AI Generated PoC successfully!")
+        MAX_RETRIES = 3
+        current_attempt = 1
+        success = False
+        error_log = ""
+        
+        self.chat.newSession()
 
+        while current_attempt <= MAX_RETRIES:
+            logger.info(f"[*] PoC Generation - Attempt {current_attempt}/{MAX_RETRIES}...")
+            
+            if current_attempt == 1:
+                poc_prompt = f'''
+                Task: Generate a Foundry Proof of Concept (PoC) script exploiting vulnerabilities in {filename}.
+                
+                TIER 1 (Math Verified - MUST USE THESE PARAMS):
+                {halmos_context if halmos_context else "None"}
+                
+                TIER 2 (AI Verified):
+                {json.dumps(ai_filtered_vulnerabilities, indent=2)}
+                
+                REQUIREMENTS:
+                1. Inherit from `Test` (forge-std/Test.sol).
+                2. Set up the environment in `setUp()`.
+                3. Write test functions starting with `test...`
+                4. Use `assertEq` or similar to prove the exploit worked (e.g., attacker gained funds).
+                
+                CRITICAL: Output ONLY the raw Solidity PoC code. Start directly with "pragma solidity". No markdown formatting, no explanations.
+                '''
+            else:
+                logger.warning(f"[-] Attempt {current_attempt-1} failed. Feeding error log to AI for correction...")
+                poc_prompt = f'''
+                The previous Solidity PoC failed to compile or run. 
+                Here is the exact error log from `forge build/test`:
+                
+                --- ERROR LOG ---
+                {error_log}
+                --- END ERROR LOG ---
+                
+                CRITICAL INSTRUCTIONS FOR CORRECTION:
+                1. Identify the EXACT line causing the syntax or import error.
+                2. Fix ONLY the errors mentioned in the log. DO NOT rewrite the entire logic if it's not broken.
+                3. Double-check semicolons (;), bracket closures (}}), and valid standard imports (forge-std/Test.sol).
+                4. Ensure all variables (like 'attacker' or 'victim') are declared before use.
+                
+                Output ONLY the complete, fixed raw Solidity code. Start directly with "pragma solidity". No yapping.
+                '''
+
+            raw_poc_code = self.chat.sendMessages(poc_prompt)
+            poc_code = raw_poc_code.replace("```solidity\n", "").replace("```", "").strip()
+            
+            with open(poc_file_path, 'w', encoding='utf-8') as f:
+                f.write(poc_code)
+                
+            logger.info(f"[*] Running `forge test` to verify PoC...")
+            result = subprocess.run(
+                ['forge', 'test', '--match-path', poc_file_path],
+                cwd=self.foundry_dir,
+                capture_output=True,
+                text=True
+            )
+            
+            output = result.stdout + result.stderr
+            
+            if result.returncode != 0 or "FAIL" in output or "Compiler run failed" in output:
+                if len(output) > 4000:
+                    error_log = output[:3000] + "\n... [TRUNCATED] ...\n" + output[-1000:]
+                else:
+                    error_log = output
+                logger.debug(f"Forge Output:\n{error_log}")
+                current_attempt += 1
+            else:
+                success = True
+                logger.info(f"[+] SUCCESS! PoC compiled and passed all assertions on attempt {current_attempt}.")
+                break 
+                
+        if not success:
+            logger.error(f"[-] AI failed to generate a valid PoC after {MAX_RETRIES} attempts. Keeping the last generated file for manual review.")
+
+        # clean up artifacts
         logger.info(f"[*] Moving ALL artifacts to: {self.final_results_dir}")
+        import shutil
         shutil.move(poc_file_path, os.path.join(self.final_results_dir, f"poc_{base_name}.t.sol"))
         for h_file in generated_halmos_files:
             if os.path.exists(h_file):
