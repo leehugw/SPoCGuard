@@ -33,7 +33,6 @@ class Chat:
         self.currentSession.append({"role": "system", "content": SYSTEM_MESSAGE})
         self.currentSession.append({"role": "user", "content": message})
 
-        # Cấu hình kết nối Ollama cục bộ
         openai.api_base = "http://localhost:11434/v1"
         openai.api_key = "KANE"
 
@@ -67,7 +66,6 @@ class Chat:
                 else:
                     logger.warning(f"API Error: {e5}")
 
-        # Tính toán lưu lượng token nội bộ
         global tokens_sent
         global tokens_received
         tokens_sent.value += len(encoder.encode(SYSTEM_MESSAGE))
