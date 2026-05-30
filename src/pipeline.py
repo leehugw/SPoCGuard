@@ -283,6 +283,7 @@ class AuditPipeline:
                 2. Set up the environment in `setUp()`.
                 3. Write test functions starting with `test...`
                 4. Use `assertEq` or similar to prove the exploit worked (e.g., attacker gained funds).
+                5. TARGET CONTRACT IMPORT RULE: You MUST import the target contract from the src directory like this: import "../src/{filename}"; DO NOT use import "./{filename}";
                 
                 CRITICAL: Output ONLY the raw Solidity PoC code. Start directly with "pragma solidity". No markdown formatting, no explanations.
                 '''
