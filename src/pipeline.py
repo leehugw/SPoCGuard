@@ -17,23 +17,30 @@ class AuditPipeline:
         self.sol_dir = sol_dir
         self.output_dir = output_dir
         self.foundry_dir = foundry_dir
+        
         self.foundry_src = os.path.join(foundry_dir, "src")
         self.foundry_test = os.path.join(foundry_dir, "test")
         self.foundry_script = os.path.join(foundry_dir, "script")
         
-        self.final_results_dir = os.path.join(self.foundry_dir, "archive")
+        self.src_dir = os.path.dirname(os.path.abspath(__file__))
+        self.res_dir = os.path.join(self.src_dir, "res")
+        self.poc_dir = os.path.join(self.res_dir, "PoC")
+        self.halmos_test_dir = os.path.join(self.res_dir, "halmos_test")
+        self.report_file = os.path.join(self.res_dir, "detection_reports.json")
+
+        os.makedirs(self.poc_dir, exist_ok=True)
+        os.makedirs(self.halmos_test_dir, exist_ok=True)
         
         self.chat = Chat()
 
-        for directory in [self.output_dir, self.final_results_dir, self.foundry_src, self.foundry_test, self.foundry_script]:
+        for directory in [self.output_dir, self.foundry_src, self.foundry_test, self.foundry_script]:
             if not os.path.exists(directory):
                 os.makedirs(directory)
                 
-        logger.info("[*] Global Setup: Cleaning environment and linking sources...")
+        logger.info("Cleaning environment and linking sources...")
         
         directories_to_clean = [
-            self.output_dir, 
-            self.final_results_dir, 
+            self.output_dir,
             self.foundry_src, 
             self.foundry_test, 
             self.foundry_script
@@ -53,7 +60,7 @@ class AuditPipeline:
         for filename in os.listdir(self.sol_dir):
             if filename.endswith(".sol"):
                 self.process_single_file(filename)
-        logger.info(f"\n[🚀 DONE] Check '{self.final_results_dir}' for Final Detection JSON and PoCs.")
+        logger.info(f"\n[DONE] Check '{self.res_dir}' report and PoCs.")
 
     def process_single_file(self, filename):
         logger.info(f"\n{'='*50}\n========== PROCESSING: {filename} ==========\n{'='*50}")
@@ -65,7 +72,6 @@ class AuditPipeline:
 
         target_sol_path = os.path.join(self.foundry_src, filename)
         slither_json_path = os.path.join(self.output_dir, f"temp_slither_{base_name}.json")
-        final_detect_path = os.path.join(self.final_results_dir, f"final_detect_{base_name}.json")
         
         logger.info(f"[*] Running Slither static analysis on {filename}...")
         subprocess.run(["slither", target_sol_path, "--json", slither_json_path], capture_output=True, text=True)
@@ -224,14 +230,25 @@ class AuditPipeline:
                 ai_filtered_vulnerabilities = ai_suspected_vulnerabilities
 
         # 4
-        final_detect_data = {
-            "target_file": filename,
+        logger.info(f"[*] Updating report file: {self.report_file}")
+        
+        global_report = {}
+        if os.path.exists(self.report_file):
+            try:
+                with open(self.report_file, 'r', encoding='utf-8') as f:
+                    global_report = json.load(f)
+            except json.JSONDecodeError:
+                global_report = {} 
+                
+        global_report[filename] = {
             "tier_1_verified_findings": verified_vulnerabilities,
-            "tier_2_odel_detected_findings": ai_filtered_vulnerabilities
+            "tier_2_model_detected_findings": ai_filtered_vulnerabilities
         }
-        with open(final_detect_path, 'w', encoding='utf-8') as f:
-            json.dump(final_detect_data, f, indent=4)
-        logger.info(f"[+] Saved AI-Verified Two-Tier Results to: {final_detect_path}")
+        
+        with open(self.report_file, 'w', encoding='utf-8') as f:
+            json.dump(global_report, f, indent=4)
+            
+        logger.info("[+] Report updated successfully.")
         
         # 5
         if not verified_vulnerabilities and not ai_filtered_vulnerabilities:
@@ -320,12 +337,22 @@ class AuditPipeline:
             logger.error(f"[-] AI failed to generate a valid PoC after {MAX_RETRIES} attempts. Keeping the last generated file for manual review.")
 
         # clean up artifacts
-        logger.info(f"[*] Moving ALL artifacts to: {self.final_results_dir}")
-        import shutil
-        shutil.move(poc_file_path, os.path.join(self.final_results_dir, f"poc_{base_name}.t.sol"))
+        logger.info("[*] Distributing artifacts to /res folders...")
+        
+        if os.path.exists(poc_file_path):
+            new_poc_path = os.path.join(self.poc_dir, f"poc_{base_name}.t.sol")
+            shutil.move(poc_file_path, new_poc_path)
+            logger.info(f"[+] Moved PoC to: {new_poc_path}")
+            
         for h_file in generated_halmos_files:
             if os.path.exists(h_file):
                 filename_only = os.path.basename(h_file)
-                shutil.move(h_file, os.path.join(self.final_results_dir, filename_only))
+                new_h_path = os.path.join(self.halmos_test_dir, filename_only)
+                shutil.move(h_file, new_h_path)
+                logger.info(f"[+] Moved Halmos test to: {new_h_path}")
                 
         logger.info(f"========== COMPLETED PROCESSING FOR: {filename} ==========\n")
+
+
+        
+        
