@@ -301,7 +301,7 @@ class AuditPipeline:
                 2. Fix ONLY the errors mentioned in the log. DO NOT rewrite the entire logic if it's not broken.
                 3. Double-check semicolons (;), bracket closures (}}), and valid standard imports (forge-std/Test.sol).
                 4. Ensure all variables (like 'attacker' or 'victim') are declared before use.
-                
+                5. TARGET CONTRACT IMPORT RULE: You MUST import the target contract from the src directory like this: import "../src/{filename}"; DO NOT use import "./{filename}";
                 Output ONLY the complete, fixed raw Solidity code. Start directly with "pragma solidity". No yapping.
                 '''
 
