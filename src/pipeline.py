@@ -23,7 +23,8 @@ class AuditPipeline:
         self.foundry_script = os.path.join(foundry_dir, "script")
         
         self.src_dir = os.path.dirname(os.path.abspath(__file__))
-        self.res_dir = os.path.join(self.src_dir, "res")
+        parent_dir = os.path.dirname(self.src_dir) 
+        self.res_dir = os.path.join(parent_dir, "res")
         self.poc_dir = os.path.join(self.res_dir, "PoC")
         self.halmos_test_dir = os.path.join(self.res_dir, "halmos_test")
         self.report_file = os.path.join(self.res_dir, "detection_reports.json")
