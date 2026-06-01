@@ -20,10 +20,10 @@ def run_halmos(contract_name="HalmosPropertyTest", foundry_dir=None):
         match = re.search(r"Counterexample:\s*(.*)", output)
         if match:
             params = match.group(1).strip()
-            logger.info(f"[+] Halmos found exploit parameters: {params}")
+            logger.info(f"Halmos found exploit parameters: {params}")
             return params
         else:
-            logger.warning("[-] Halmos could not find a mathematical exploit path.")
+            logger.warning("Halmos could not find a mathematical exploit path.")
             logger.error("============= HALMOS RAW OUTPUT =============")
             print(output) 
             logger.error("=============================================")

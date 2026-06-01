@@ -84,8 +84,3 @@ class Chat:
 
         return reply_content
     
-    def makeYesOrNoQuestion(self, question: str) -> str:
-        return f"{question}. Please answer in one word, yes or no."
-    
-    def makeCodeQuestion(self, question: str, code: str) -> str:
-        return f'Please analyze the following code, and answer the question "{question}"\n{code}'

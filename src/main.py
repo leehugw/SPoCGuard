@@ -29,7 +29,7 @@ def main():
     welcome()
 
     SOL_DIR = os.path.join(BASE_DIR, "sourcecode") 
-    OUTPUT_DIR = os.path.join(BASE_DIR, "res") 
+    OUTPUT_DIR = os.path.join(PROJECT_ROOT, "res") 
     FOUNDRY_DIR = os.path.join(PROJECT_ROOT, "foundry_workspace")
 
     pipeline = AuditPipeline(

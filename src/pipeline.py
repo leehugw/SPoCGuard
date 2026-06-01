@@ -74,11 +74,11 @@ class AuditPipeline:
         target_sol_path = os.path.join(self.foundry_src, filename)
         slither_json_path = os.path.join(self.output_dir, f"temp_slither_{base_name}.json")
         
-        logger.info(f"[*] Running Slither static analysis on {filename}...")
+        logger.info(f"Running Slither static analysis on {filename}...")
         subprocess.run(["slither", target_sol_path, "--json", slither_json_path], capture_output=True, text=True)
         
         if not os.path.exists(slither_json_path):
-            logger.warning(f"[-] Slither failed to analyze {filename}. Skipping.")
+            logger.warning(f"Slither failed to analyze {filename}. Skipping.")
             return
             
         with open(slither_json_path, 'r', encoding='utf-8') as f:
@@ -139,7 +139,7 @@ class AuditPipeline:
                     })
         
         if not detectors_found:
-            logger.info(f"[+] No critical vulnerabilities found in {filename} by Slither. Skipping.")
+            logger.info(f"No critical vulnerabilities found in {filename} by Slither. Skipping.")
             return
         
         # 3
@@ -148,7 +148,7 @@ class AuditPipeline:
         halmos_context = ""
         generated_halmos_files = [] 
         
-        logger.info(f"[*] Filtering vulnerabilities through Halmos (Two-Tier System)...")
+        logger.info(f"Filtering vulnerabilities through Halmos (Two-Tier System)...")
         for det in detectors_found:
             check_type = det["vulnerability"]
             contract_name = det["contract_name"].strip()
@@ -157,7 +157,7 @@ class AuditPipeline:
             template_str = get_template(check_type)
             
             if template_str and contract_name != "UnknownContract" and vuln_function != "UnknownFunction":
-                logger.info(f"[!] Generating dynamic Halmos test for: {check_type} in {contract_name}.{vuln_function}()")
+                logger.info(f"Generating dynamic Halmos test for: {check_type} in {contract_name}.{vuln_function}()")
                 
                 dynamic_code = template_str \
                     .replace("{TARGET_FILENAME}", filename) \
@@ -170,34 +170,34 @@ class AuditPipeline:
                 
                 generated_halmos_files.append(halmos_test_path)
                 
-                logger.info("[*] Flushing Foundry cache...")
+                logger.info("Flushing Foundry cache...")
                 subprocess.run(["forge", "clean"], cwd=self.foundry_dir, capture_output=True)
                 
                 halmos_contract_name = f"HalmosPropertyTest_{contract_name}"
                 params = run_halmos(contract_name=halmos_contract_name, foundry_dir=self.foundry_dir)
                 
                 if params:
-                    logger.info(f"[+] TIER 1: Halmos CONFIRMED vulnerability: {check_type}")
+                    logger.info(f"TIER 1: Halmos Confirmed vulnerability: {check_type}")
                     det["halmos_math_proof"] = params 
                     verified_vulnerabilities.append(det)
                     halmos_context += f"- Vulnerability: {check_type} in {contract_name}.{vuln_function}() | Params: {params}\n"
                 else:
-                    logger.warning(f"[-] TIER 2: Halmos failed to prove {check_type}. Downgrading to AI Suspected.")
+                    logger.warning(f"TIER 2: Halmos failed to prove {check_type}. Downgrading to AI Suspected.")
                     ai_suspected_vulnerabilities.append(det)
             else:
-                logger.info(f"[*] TIER 2: No template available for {check_type}. Sending directly to AI.")
+                logger.info(f"TIER 2: No template available for {check_type}. Sending directly to AI.")
                 det["status"] = "AI_SUSPECTED"
                 ai_suspected_vulnerabilities.append(det)
 
         if not verified_vulnerabilities and not ai_suspected_vulnerabilities:
-            logger.info(f"[+] All findings dropped. Contract is likely safe. Stopping pipeline.")
+            logger.info(f"All findings dropped. Contract is likely safe. Stopping pipeline.")
             return
 
         # 3.5
         ai_filtered_vulnerabilities = []
         
         if ai_suspected_vulnerabilities:
-            logger.info(f"[*] TIER 2: AI is analyzing {len(ai_suspected_vulnerabilities)} suspected findings to filter False Positives...")
+            logger.info(f" TIER 2: AI is analyzing {len(ai_suspected_vulnerabilities)} suspected findings to filter False Positives...")
             self.chat.newSession()
             
             detect_prompt = f'''
@@ -225,13 +225,13 @@ class AuditPipeline:
             
             try:
                 ai_filtered_vulnerabilities = json.loads(cleaned_json_str)
-                logger.info(f"[+] AI successfully filtered Tier 2. Kept {len(ai_filtered_vulnerabilities)} real vulnerabilities.")
+                logger.info(f" AI successfully filtered Tier 2. Kept {len(ai_filtered_vulnerabilities)} real vulnerabilities.")
             except Exception as e:
-                logger.error(f"[-] AI returned invalid JSON during detection: {e}. Defaulting to original Slither findings.")
+                logger.error(f" AI returned invalid JSON during detection: {e}. Defaulting to original Slither findings.")
                 ai_filtered_vulnerabilities = ai_suspected_vulnerabilities
 
         # 4
-        logger.info(f"[*] Updating report file: {self.report_file}")
+        logger.info(f" Updating report file: {self.report_file}")
         
         global_report = {}
         if os.path.exists(self.report_file):
@@ -249,14 +249,14 @@ class AuditPipeline:
         with open(self.report_file, 'w', encoding='utf-8') as f:
             json.dump(global_report, f, indent=4)
             
-        logger.info("[+] Report updated successfully.")
+        logger.info(" Report updated successfully.")
         
         # 5
         if not verified_vulnerabilities and not ai_filtered_vulnerabilities:
-            logger.info("[+] Contract is secure. No PoC needed.")
+            logger.info(" Contract is secure. No PoC needed.")
             return
 
-        logger.info(f"[*] Starting AI PoC Generation with Auto-Correction (Max Retries: 3)...")
+        logger.info(f" Starting AI PoC Generation with Auto-Correction (Max Retries: 3)...")
         
         poc_file_path = os.path.join(self.foundry_test, f"poc_{base_name}.t.sol")
         MAX_RETRIES = 3
@@ -267,7 +267,7 @@ class AuditPipeline:
         self.chat.newSession()
 
         while current_attempt <= MAX_RETRIES:
-            logger.info(f"[*] PoC Generation - Attempt {current_attempt}/{MAX_RETRIES}...")
+            logger.info(f" PoC Generation - Attempt {current_attempt}/{MAX_RETRIES}...")
             
             if current_attempt == 1:
                 poc_prompt = f'''
@@ -289,7 +289,7 @@ class AuditPipeline:
                 CRITICAL: Output ONLY the raw Solidity PoC code. Start directly with "pragma solidity". No markdown formatting, no explanations.
                 '''
             else:
-                logger.warning(f"[-] Attempt {current_attempt-1} failed. Feeding error log to AI for correction...")
+                logger.warning(f" Attempt {current_attempt-1} failed. Feeding error log to AI for correction...")
                 poc_prompt = f'''
                 The previous Solidity PoC failed to compile or run. 
                 Here is the exact error log from `forge build/test`:
@@ -313,7 +313,7 @@ class AuditPipeline:
             with open(poc_file_path, 'w', encoding='utf-8') as f:
                 f.write(poc_code)
                 
-            logger.info(f"[*] Running `forge test` to verify PoC...")
+            logger.info(f" Running `forge test` to verify PoC...")
             result = subprocess.run(
                 ['forge', 'test', '--match-path', poc_file_path],
                 cwd=self.foundry_dir,
@@ -332,26 +332,26 @@ class AuditPipeline:
                 current_attempt += 1
             else:
                 success = True
-                logger.info(f"[+] SUCCESS! PoC compiled and passed all assertions on attempt {current_attempt}.")
+                logger.info(f" SUCCESS! PoC compiled and passed all assertions on attempt {current_attempt}.")
                 break 
                 
         if not success:
-            logger.error(f"[-] AI failed to generate a valid PoC after {MAX_RETRIES} attempts. Keeping the last generated file for manual review.")
+            logger.error(f" AI failed to generate a valid PoC after {MAX_RETRIES} attempts. Keeping the last generated file for manual review.")
 
         # clean up artifacts
-        logger.info("[*] Distributing artifacts to /res folders...")
+        logger.info(" Distributing artifacts to /res folders...")
         
         if os.path.exists(poc_file_path):
             new_poc_path = os.path.join(self.poc_dir, f"poc_{base_name}.t.sol")
             shutil.move(poc_file_path, new_poc_path)
-            logger.info(f"[+] Moved PoC to: {new_poc_path}")
+            logger.info(f" Moved PoC to: {new_poc_path}")
             
         for h_file in generated_halmos_files:
             if os.path.exists(h_file):
                 filename_only = os.path.basename(h_file)
                 new_h_path = os.path.join(self.halmos_test_dir, filename_only)
                 shutil.move(h_file, new_h_path)
-                logger.info(f"[+] Moved Halmos test to: {new_h_path}")
+                logger.info(f" Moved Halmos test to: {new_h_path}")
                 
         logger.info(f"========== COMPLETED PROCESSING FOR: {filename} ==========\n")
 
